@@ -1,0 +1,41 @@
+.c1 {
+    background-color: #360568;
+}
+.c2 {
+    background-color: #5B2A86;
+}
+.c3 {
+    background-color: #7785AC;
+}
+.c4 {
+    background-color: #9AC6C5;
+    border-color: #9AC6C5 !important;
+}
+.c5 {
+    background-color: #A5E6BA;
+}
+.breaktext{
+    word-break: break-all;
+}
+.t1{
+    color: white;
+}
+.t2{
+    color: black;
+}
+.nav_lab{
+    height: 80px;
+    padding: 2%;
+}
+.challenge{
+    height: 400px;
+    padding: 10px;
+    margin: 20px;
+   
+}
+#e1{
+
+    margin: 20px;
+    padding: 10px;
+    border: 2px solid #9AC6C5;
+}
