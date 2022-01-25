@@ -1,24 +1,63 @@
 package service.labsec_service_challenge.entity;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.apache.tomcat.util.http.fileupload.FileUtils;
-import org.bouncycastle.*;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
-import org.springframework.data.util.Pair;
 
-import java.io.File;
+import javax.persistence.*;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.security.*;
 
 
-/**
- * Classe responsável por executar a etapa 1
- */
+@Entity
+@Table(name = "Cryptography")
 public class Cryptography {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private long id;
 
+    @Column(nullable = false, length=10485760)
+    private String public_key;
+
+    @Column(nullable = false, length=10485760)
+    private String private_key;
+
+    @OneToOne(mappedBy = "crypto")
+    private Authority auth;
+
+    public Cryptography(){}
+
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public String getPublic_key() {
+        return public_key;
+    }
+
+    public void setPublic_key(String public_key) {
+        this.public_key = public_key;
+    }
+
+    public String getPrivate_key() {
+        return private_key;
+    }
+
+    public void setPrivate_key(String private_key) {
+        this.private_key = private_key;
+    }
+
+    public Authority getAuth() {
+        return auth;
+    }
+
+    public void setAuth(Authority auth) {
+        this.auth = auth;
+    }
 
     public String getsha256hash(byte[] file_to_convert) throws NoSuchAlgorithmException, IOException {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
