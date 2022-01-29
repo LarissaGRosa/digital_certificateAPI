@@ -91,65 +91,18 @@ public class UserController {
         } else if (cer.findByName(sr.getCN()).isPresent()){
             return new MessageResponse("This cert name is already in use").getMessage();
         }
-
-
-        File f = new File("src/main/resources/certificados_gerados/"+sr.getCN()+".pem");
-        if (f.isFile() && f.canRead()) {
-            return "Esse arquivo já existe";
-        }
-
-        //generate public key
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        keyGen.initialize(1024);
-        KeyPair key = keyGen.generateKeyPair();
-        PublicKey pub = key.getPublic();
-
-
         //get authority data
         Authority a = ar.getById(sr.getAuth_id());
-        X500Name issuer = a.subject_load(a.getSubject());
-
-        Base64 encoder = new Base64();
-        File filePrivateKey = new File(a.getCrypto().getPrivate_key());
-        FileInputStream fis = new FileInputStream(a.getCrypto().getPrivate_key());
-        byte[] encodedPrivateKey = new byte[(int) filePrivateKey.length()];
-        fis.read(encodedPrivateKey);
-        fis.close();
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-
-        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(
-                encodedPrivateKey);
-        PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
-
-
-        // create subject
-        X500Name subject = a.subject_create(sr.getCN(), sr.getOU(), sr.getO(), sr.getL(), sr.getST(), sr.getC(), sr.getUI());
 
         //generate certification
         CertificateCA c = new CertificateCA();
-        X509Certificate cert =   c.makeCertificate(pub, 1, privateKey, new AlgorithmIdentifier(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption.getId())), subject, issuer);
-        byte[] derCert = cert.getEncoded();
-        String pemCertPre = new String(encoder.encode(derCert));
-        String pemCert = pemCertPre;
-        File file = new File("src/main/resources/certificados_gerados/"+sr.getCN()+".pem");
-        File cert_pubk = new File("src/main/resources/certificados_gerados/"+sr.getCN()+"_pubk.pem");
-        try (OutputStream os = new FileOutputStream(file)) {
-            os.write(pemCert.getBytes(StandardCharsets.UTF_8));
-        }
-        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
-                pub.getEncoded());
-        FileOutputStream fos = new FileOutputStream(cert_pubk);
-        fos.write(x509EncodedKeySpec.getEncoded());
-        fos.close();
-
-
+        c.create_and_save_cert(sr, a);
         //store on database
         System.out.println(jwt.substring(7));
         String user_name = jwtUtils.getUserNameFromJwtToken(jwt.substring(7));
         Optional<User> user = ur.findByUsername(user_name);
         if (user.isPresent()){
             c.setName(sr.getCN());
-            c.setSubject(String.valueOf(subject));
             c.setValid(false);
             c.setIssuer(ar.getById(sr.getAuth_id()));
             c.setCert_owner(user.get());
@@ -236,9 +189,7 @@ public class UserController {
         if (cer.findByName(name).isPresent()){
             CertificateCA c = cer.findByName(name).get();
             if (c.getValid()){
-                File file = new File("src/main/resources/certificados_gerados/"+name+".pem");
-                String content = new String (Files.readAllBytes(file.toPath()));
-                return content;
+                return c.getCertdata();
 
 
             } else {return "cant download";}

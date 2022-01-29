@@ -50,7 +50,7 @@ print('TESTE 3 - CRIAR CERTIFICADO DIGITAL')
 headers1 = { "content-type": "application/json",
               "Authorization": "Bearer "+ token }
 body_data = {"cn":"meu certificado teste 2", "ou":"aa", "o":"AAA", "l":"AAAA", "st":"AAAA", "c":"BBB", "ui":"KKKKKK",
-             "auth_id":"12"}
+             "auth_id":"2"}
 
 try:
     req1 = requests.post(

@@ -7,12 +7,17 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.asn1.x509.Certificate;
 import org.bouncycastle.jce.provider.X509CertificateObject;
-
+import org.bouncycastle.util.encoders.Base64;
+import service.labsec_service_challenge.payloads.SubjectRequest;
+import org.springframework.data.util.Pair;
 import javax.persistence.*;
 import java.io.IOException;
 import java.security.*;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Date;
 
 @Entity
@@ -42,8 +47,27 @@ public class CertificateCA
     @Column(nullable = false)
     private String subject;
 
+    @Column(nullable = false, length=10485760 )
+    private String certdata;
+
     public User getCert_owner() {
         return certowner;
+    }
+
+    public String getCertdata() {
+        return certdata;
+    }
+
+    public User getCertowner() {
+        return certowner;
+    }
+
+    public void setCertowner(User certowner) {
+        this.certowner = certowner;
+    }
+
+    public void setCertdata(String certdata) {
+        this.certdata = certdata;
     }
 
     public void setCert_owner(User cert_owner) {
@@ -109,5 +133,29 @@ public class CertificateCA
         encodableVector.add(der);
         return new X509CertificateObject(Certificate.getInstance(new DERSequence(encodableVector)));
     }
+
+    public void create_and_save_cert(SubjectRequest sr, Authority a) throws CertificateEncodingException, NoSuchAlgorithmException, CertificateParsingException, SignatureException, IOException, InvalidKeyException, InvalidKeySpecException {
+        Common utils = new Common();
+        Pair<PrivateKey,PublicKey> keys = utils.getKeyPair();
+        X500Name issuer = utils.subject_load(a.getSubject());
+        X500Name subject = utils.subject_create(sr.getCN(), sr.getOU(), sr.getO(), sr.getL(), sr.getST(), sr.getC(), sr.getUI());
+        byte[] keyBytes = java.util.Base64.getDecoder().decode(a.getCrypto().getPrivate_key());
+
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(
+                keyBytes);
+        PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
+        X509Certificate cert = this.makeCertificate(keys.getSecond(), 1, privateKey, new AlgorithmIdentifier(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption.getId())), subject, issuer);
+        org.bouncycastle.util.encoders.Base64 encoder = new Base64();
+
+        this.setSubject(String.valueOf(subject));
+        byte[] derCert = cert.getEncoded();
+        String pemCertPre = new String(encoder.encode(derCert));
+        String pemCert = pemCertPre;
+        this.setCertdata(pemCert);
+
+    }
+
 }
 

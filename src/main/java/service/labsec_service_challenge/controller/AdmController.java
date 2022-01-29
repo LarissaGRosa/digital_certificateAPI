@@ -52,7 +52,8 @@ import service.labsec_service_challenge.payloads.SubjectRequest;
 import service.labsec_service_challenge.repository.AuthorityRepository;
 import service.labsec_service_challenge.repository.CryptographyRepository;
 import service.labsec_service_challenge.repository.UserRepository;
-
+import java.util.Base64.Encoder;
+import java.util.Base64.Decoder;
 @EnableConfigurationProperties({
         FileProp.class
 })
@@ -83,63 +84,18 @@ public class AdmController {
         if (ar.findByName(sr.getCN()).isPresent()){
             return new MessageResponse("This ac name is already in use").toString();
         }
-
-        //create keys
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        keyGen.initialize(1024);
-        KeyPair key = keyGen.generateKeyPair();
-        PrivateKey priv = key.getPrivate();
-        PublicKey pub = key.getPublic();
-
-        //
         Authority a = new Authority();
-        Base64 encoder = new Base64();
-        X500Name subject = a.subject_create(sr.getCN(), sr.getOU(), sr.getO(), sr.getL(), sr.getST(), sr.getC(), sr.getUI());
-        X509Certificate cert = a.makeCertificate(pub, 1, priv, new AlgorithmIdentifier(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption.getId())), subject);
-
-        byte[] derCert = cert.getEncoded();
-        String pemCertPre = new String(encoder.encode(derCert));
-        String pemCert = pemCertPre;
-        File file = new File("src/main/resources/ac_raiz/"+sr.getCN()+".pem");
-        File cert_pk = new File("src/main/resources/ac_raiz/ac_priv"+sr.getCN()+".pem");
-        File cert_pubk = new File("src/main/resources/ac_raiz/ac_pubk"+sr.getCN()+".pem");
-        try (OutputStream os = new FileOutputStream(file)) {
-            os.write(pemCert.getBytes(StandardCharsets.UTF_8));
-        }
-
-        // Store Public Key.
-        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
-                pub.getEncoded());
-        FileOutputStream fos = new FileOutputStream(cert_pubk);
-        fos.write(x509EncodedKeySpec.getEncoded());
-        fos.close();
-
-        // Store Private Key.
-        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(
-                priv.getEncoded());
-        fos = new FileOutputStream(cert_pk);
-        fos.write(pkcs8EncodedKeySpec.getEncoded());
-        fos.close();
-
-
-        //store on database
-        Cryptography save_crypto = new Cryptography();
-        save_crypto.setPrivate_key("src/main/resources/ac_raiz/ac_priv"+sr.getCN()+".pem");
-        save_crypto.setPublic_key("src/main/resources/ac_raiz/ac_pubk"+sr.getCN()+".pem");
-        save_crypto  = cr.saveAndFlush(save_crypto);
-
+        a.create_and_save_cert(sr);
         String user_name = jwtUtils.getUserNameFromJwtToken(jwt.substring(7));
         Optional<User> user = ur.findByUsername(user_name);
         if (user.isPresent()){
             a.setName(sr.getCN());
-            a.setSubject(String.valueOf(subject));
             a.setValid(true);
-            a.setData_location(String.valueOf(file));
-            a.setCrypto(save_crypto);
+            a.setCrypto(cr.saveAndFlush(a.getCrypto()));
             a.setOwner(user.get());
             ar.save(a);
         }
-        return cert.toString();
+        return a.getCertdata();
     }
 
 

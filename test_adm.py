@@ -139,7 +139,7 @@ print('TESTE 7 - LIBERAR CERTIFICADO')
 headers1 = { 'content-type': 'application/json',
 'Authorization': "Bearer "+ token
 }
-body_data = {"dc_id":"17"}
+body_data = {"dc_id":"3"}
 
 try:
     req1 = requests.put(

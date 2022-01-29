@@ -1,5 +1,5 @@
 package service.labsec_service_challenge.entity;
-
+import org.springframework.data.util.Pair;
 import org.bouncycastle.asn1.*;
 
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
@@ -9,9 +9,17 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.asn1.x509.Certificate;
 import org.bouncycastle.jce.provider.X509CertificateObject;
+import org.bouncycastle.util.encoders.Base64;
 
+import service.labsec_service_challenge.payloads.SubjectRequest;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.*;
@@ -36,9 +44,9 @@ public class Authority {
     @Column(nullable = false)
     private Boolean isValid;
 
+    @Column(nullable = false, length=10485760)
+    private String Certdata;
 
-    @Column(nullable = false)
-    private String data_location;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "crypto_id", referencedColumnName = "id")
@@ -80,13 +88,6 @@ public class Authority {
         this.subject = subject;
     }
 
-    public String getData_location() {
-        return data_location;
-    }
-
-    public void setData_location(String data_location) {
-        this.data_location = data_location;
-    }
 
     public Cryptography getCrypto() {
         return crypto;
@@ -120,8 +121,18 @@ public class Authority {
         isValid = valid;
     }
 
+    public String getCertdata() {
+        return Certdata;
+    }
+
+    public void setCertdata(String certdata) {
+        Certdata = certdata;
+    }
+
     public X509Certificate makeCertificate(PublicKey pk, int serialNumber, PrivateKey privatek,
                                            AlgorithmIdentifier signaturealgo, X500Name subject) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, IOException, CertificateParsingException {
+
+
         V3TBSCertificateGenerator g = new V3TBSCertificateGenerator();
         g.setSerialNumber(new ASN1Integer(serialNumber));
         g.setIssuer(subject);
@@ -140,44 +151,29 @@ public class Authority {
         encodableVector.add(tbs);
         encodableVector.add(signaturealgo);
         encodableVector.add(der);
+
+
         return new X509CertificateObject(Certificate.getInstance(new DERSequence(encodableVector)));
     }
 
-    public X500Name subject_create(String CN, String OU, String O, String
-                                   L, String ST, String C, String UI){
-        X500NameBuilder x500NameBld = new X500NameBuilder(BCStyle.INSTANCE);
-        x500NameBld.addRDN(BCStyle.CN,  CN);
-        x500NameBld.addRDN(BCStyle.OU, OU);
-        x500NameBld.addRDN(BCStyle.O, O);
-        x500NameBld.addRDN(BCStyle.L, L);
-        x500NameBld.addRDN(BCStyle.ST, ST);
-        x500NameBld.addRDN(BCStyle.C, C);
-        x500NameBld.addRDN(BCStyle.UNIQUE_IDENTIFIER, UI);
-        X500Name subject = x500NameBld.build();
-        return subject;
-    }
-    public X500Name subject_load(String items){
-        X500NameBuilder x500NameBld = new X500NameBuilder(BCStyle.INSTANCE);
-        List<String> data = Arrays.asList(items.split(","));
-        String CN = Arrays.asList(data.get(0).split("=")).get(1);
-        String OU = Arrays.asList(data.get(1).split("=")).get(1);
-        String O = Arrays.asList(data.get(2).split("=")).get(1);
-        String L = Arrays.asList(data.get(3).split("=")).get(1);
-        String ST = Arrays.asList(data.get(4).split("=")).get(1);
-        String C = Arrays.asList(data.get(5).split("=")).get(1);
-        String UI = Arrays.asList(data.get(6).split("=")).get(1);
-        x500NameBld.addRDN(BCStyle.CN,  CN);
-        x500NameBld.addRDN(BCStyle.OU, OU);
-        x500NameBld.addRDN(BCStyle.O, O);
-        x500NameBld.addRDN(BCStyle.L, L);
-        x500NameBld.addRDN(BCStyle.ST, ST);
-        x500NameBld.addRDN(BCStyle.C, C);
-        x500NameBld.addRDN(BCStyle.UNIQUE_IDENTIFIER, UI);
-        X500Name subject = x500NameBld.build();
-        return subject;
-    }
 
+    public void create_and_save_cert(SubjectRequest sr) throws CertificateEncodingException, NoSuchAlgorithmException, CertificateParsingException, SignatureException, IOException, InvalidKeyException {
+        Common utils = new Common();
+        Pair<PrivateKey,PublicKey> keys = utils.getKeyPair();
+        X500Name subject = utils.subject_create(sr.getCN(), sr.getOU(), sr.getO(), sr.getL(), sr.getST(), sr.getC(), sr.getUI());
+        X509Certificate cert = this.makeCertificate(keys.getSecond(), 1, keys.getFirst(), new AlgorithmIdentifier(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption.getId())), subject);
+        org.bouncycastle.util.encoders.Base64 encoder = new Base64();
 
+        this.setCrypto(new Cryptography());
+        this.getCrypto().setPrivate_key(java.util.Base64.getEncoder().encodeToString(keys.getFirst().getEncoded()));
+        this.getCrypto().setPublic_key(java.util.Base64.getEncoder().encodeToString(keys.getSecond().getEncoded()));
+        this.setSubject(String.valueOf(subject));
+        byte[] derCert = cert.getEncoded();
+        String pemCertPre = new String(encoder.encode(derCert));
+        String pemCert = pemCertPre;
+        this.setCertdata(pemCert);
+
+    }
 
 
 }
